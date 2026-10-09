@@ -29,7 +29,19 @@ jobs:
           cache: gradle
 
       - name: Test and build
-        run: ./gradlew :core:test :mod:build :mod:runGameTestServer --console=plain
+        run: |
+          set -o pipefail
+          ./gradlew :core:test :mod:build :mod:runGameTestServer --console=plain 2>&1 | tee build.log
+
+      # Puts the reason on the run's page, where it can be read without opening the log.
+      - name: Explain the failure
+        if: failure()
+        run: |
+          [ -f build.log ] || exit 0
+          grep -E -A8 'What went wrong|FAILED$|required tests failed|error:|Exception' build.log | head -n 80 > failure.txt || true
+          [ -s failure.txt ] || tail -n 40 build.log > failure.txt
+          { echo '```'; cat failure.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error title=Why the build failed::$(head -n 40 failure.txt | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')"
 
       - name: Read the versions
         id: versions
