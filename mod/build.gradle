@@ -1,0 +1,101 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.147'
+}
+
+evaluationDependsOn(':core')
+
+version = mod_version
+group = 'aptracker'
+
+base {
+    archivesName = mod_id
+}
+
+// Minecraft 26.x runs on Java 25.
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+repositories {
+    mavenCentral()
+}
+
+// Game tests run inside a real server next to the mod. They are loaded in development runs only
+// and are not part of the jar.
+sourceSets {
+    gametest {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
+
+neoForge {
+    version = project.neo_version
+    addModdingDependenciesTo(sourceSets.gametest)
+
+    runs {
+        server {
+            server()
+            programArgument '--nogui'
+            gameDirectory = project.file('run/server')
+        }
+
+        // Starts a headless server with both mods, runs the game tests, then exits.
+        gameTestServer {
+            type = "gameTestServer"
+            gameDirectory = project.file('run/gametest')
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+    }
+
+    mods {
+        // The logic engine is compiled by :core and shipped inside this mod's jar.
+        "${mod_id}" {
+            sourceSet sourceSets.main
+            sourceSet project(':core').sourceSets.main
+            sourceSet sourceSets.gametest
+        }
+    }
+}
+
+dependencies {
+    compileOnly project(':core')
+
+    // The randomizer mod this tracker reads its state from, and the Archipelago client library it bundles.
+    compileOnly files(rootProject.file(aprandomizer_jar))
+    compileOnly 'io.github.archipelagomw:Java-Client:0.2.1'
+
+    // Loads the randomizer mod in the development server.
+    runtimeOnly files(rootProject.file(aprandomizer_jar))
+}
+
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version_range   : minecraft_version_range,
+            neo_version_range         : neo_version_range,
+            aprandomizer_version_range: aprandomizer_version_range,
+            mod_id                    : mod_id,
+            mod_name                  : mod_name,
+            mod_license               : mod_license,
+            mod_version               : mod_version,
+            mod_authors               : mod_authors,
+            mod_description           : mod_description
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+jar {
+    from project(':core').sourceSets.main.output
+    // The jar carries rules and data derived from the apworld, so it ships the notices with it.
+    from(rootProject.files('LICENSE', 'THIRD_PARTY_NOTICES.md')) {
+        into 'META-INF'
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

@@ -1,0 +1,41 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'aptracker'
+
+// The logic engine has no Minecraft dependency, so it stays on Java 17 and is testable on its own.
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Minecraft ships Gson, so it is not passed on to the mod.
+    compileOnly 'com.google.code.gson:gson:2.11.0'
+    testImplementation 'com.google.code.gson:gson:2.11.0'
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+test {
+    useJUnitPlatform()
+    // The tests replay the apworld's own test cases, read straight from the apworld file.
+    systemProperty 'aptracker.apworld', rootProject.file(rootProject.property('apworld_file')).absolutePath
+    inputs.file(rootProject.file(rootProject.property('apworld_file')))
+    testLogging {
+        events 'failed'
+        exceptionFormat = 'full'
+    }
+}
