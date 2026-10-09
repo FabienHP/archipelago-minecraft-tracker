@@ -1,5 +1,7 @@
 # Archipelago Advancement Tracker (Minecraft)
 
+<img src="docs/icon.png" alt="" width="96" align="right">
+
 A **server-side** NeoForge mod that shows, during a Minecraft
 [Archipelago](https://archipelago.gg) game, which advancements are doable with the items received so
 far. Players keep a vanilla Minecraft client: there is nothing to install on their side.
@@ -81,9 +83,11 @@ builds the jar; if `mod_version` in `gradle.properties` has no release yet, it c
 release and publishes the same file to Modrinth. **To release, change `mod_version` and merge.**
 
 Modrinth publishing needs two repository settings (Settings > Secrets and variables > Actions): the
-secret `MODRINTH_TOKEN` (a Modrinth personal access token with the "Create versions" scope) and the
-variable `MODRINTH_PROJECT_ID`. Without them that step is skipped. After adding them, run the Build
-workflow by hand on `main` to publish the current release.
+secret `MODRINTH_TOKEN` (a Modrinth personal access token with the "Create versions", "Read
+versions" and "Read projects" scopes) and the variable `MODRINTH_PROJECT_ID`. Without them that step
+is skipped. After adding them, run the Build workflow by hand on `main` to publish the current
+release. Modrinth tokens expire: when publishing starts failing with an authorization error, create
+a new token and replace the secret.
 
 ### New NeoForgeAP releases
 

@@ -118,6 +118,7 @@ jobs:
               game_versions: [$minecraft],
               version_type: "release",
               loaders: ["neoforge"],
+              environment: "dedicated_server_only",
               featured: true,
               file_parts: ["file"],
               primary_file: "file"
