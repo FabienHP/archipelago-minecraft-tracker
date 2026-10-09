@@ -1,0 +1,116 @@
+name: Build
+
+# Tests and builds every push. On main, a version of gradle.properties (mod_version) that has no
+# release yet is published: to release, change mod_version and merge.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # A pull request opened from a branch of this repository is already built by its push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            25
+          cache: gradle
+
+      - name: Test and build
+        run: ./gradlew :core:test :mod:build :mod:runGameTestServer --console=plain
+
+      - name: Read the versions
+        id: versions
+        run: |
+          property() { grep "^$1=" gradle.properties | cut -d= -f2-; }
+          version=$(property mod_version)
+          {
+            echo "version=$version"
+            echo "tag=v${version%%+*}"
+            echo "jar=mod/build/libs/$(property mod_id)-$version.jar"
+            echo "minecraft=$(property minecraft_version)"
+            echo "upstream=$(property upstream_release)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish the GitHub release
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.versions.outputs.tag }}
+          VERSION: ${{ steps.versions.outputs.version }}
+          JAR: ${{ steps.versions.outputs.jar }}
+          MINECRAFT: ${{ steps.versions.outputs.minecraft }}
+          UPSTREAM: ${{ steps.versions.outputs.upstream }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG already exists: nothing to publish."
+            exit 0
+          fi
+          cat > notes.md <<EOF
+          For **Minecraft $MINECRAFT** with **NeoForgeAP $UPSTREAM**.
+
+          Put \`$(basename "$JAR")\` in the \`mods\` folder of your Minecraft AP server, next to \`Archipelago.jar\`. Players keep a vanilla client.
+          EOF
+          gh release create "$TAG" "$JAR" --target "$GITHUB_SHA" \
+            --title "${TAG#v} for Minecraft $MINECRAFT" --notes-file notes.md --generate-notes
+
+      # Skipped until the MODRINTH_TOKEN secret and the MODRINTH_PROJECT_ID variable are set.
+      # Running this workflow by hand on main then publishes the current release there.
+      - name: Publish to Modrinth
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_PROJECT_ID: ${{ vars.MODRINTH_PROJECT_ID }}
+          TAG: ${{ steps.versions.outputs.tag }}
+          VERSION: ${{ steps.versions.outputs.version }}
+          MINECRAFT: ${{ steps.versions.outputs.minecraft }}
+          UPSTREAM: ${{ steps.versions.outputs.upstream }}
+        run: |
+          if [ -z "$MODRINTH_TOKEN" ] || [ -z "$MODRINTH_PROJECT_ID" ]; then
+            echo "Modrinth is not configured: skipping."
+            exit 0
+          fi
+          api=https://api.modrinth.com/v2
+          agent="github.com/$GITHUB_REPOSITORY"
+          published=$(curl -fsS -H "Authorization: $MODRINTH_TOKEN" -H "User-Agent: $agent" \
+            "$api/project/$MODRINTH_PROJECT_ID/version" \
+            | jq --arg version "$VERSION" '[.[] | select(.version_number == $version)] | length')
+          if [ "$published" != "0" ]; then
+            echo "Modrinth already has version $VERSION."
+            exit 0
+          fi
+
+          # Publish the very file that is attached to the GitHub release.
+          mkdir modrinth
+          gh release download "$TAG" --pattern '*.jar' --dir modrinth
+          jq -n --arg project "$MODRINTH_PROJECT_ID" --arg version "$VERSION" --arg minecraft "$MINECRAFT" \
+            --arg notes "For Minecraft $MINECRAFT with NeoForgeAP $UPSTREAM." '{
+              project_id: $project,
+              name: $version,
+              version_number: $version,
+              changelog: $notes,
+              dependencies: [],
+              game_versions: [$minecraft],
+              version_type: "release",
+              loaders: ["neoforge"],
+              featured: true,
+              file_parts: ["file"],
+              primary_file: "file"
+            }' > modrinth/data.json
+          curl --fail-with-body -sS -X POST "$api/version" \
+            -H "Authorization: $MODRINTH_TOKEN" -H "User-Agent: $agent" \
+            -F "data=<modrinth/data.json;type=application/json" \
+            -F "file=@$(ls modrinth/*.jar);type=application/java-archive"

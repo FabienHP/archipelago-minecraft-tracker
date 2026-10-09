@@ -68,6 +68,19 @@ dependencies {
     runtimeOnly files(rootProject.file(aprandomizer_jar))
 }
 
+// The randomizer reads its slot file from APData when the server starts, and refuses a world that
+// was created for another seed: the game test gets its own slot file and a new world every time.
+var resetGameTestWorld = tasks.register("resetGameTestWorld", Sync) {
+    from "src/gametest/apmc"
+    into "run/gametest/APData"
+    doFirst {
+        delete "run/gametest/gametestserver"
+    }
+}
+tasks.matching { it.name == "runGameTestServer" }.configureEach {
+    dependsOn resetGameTestWorld
+}
+
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
     var replaceProperties = [
             minecraft_version_range   : minecraft_version_range,

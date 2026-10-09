@@ -1,0 +1,9 @@
+* text=auto
+
+# The Gradle wrapper script runs on Linux and macOS, where a CRLF line ending breaks it.
+gradlew text eol=lf
+*.bat text eol=crlf
+
+*.jar binary
+*.apworld binary
+*.gz binary

@@ -1,0 +1,131 @@
+name: Upstream update
+
+# Every day, looks for a NeoForgeAP release newer than the one this project is built against.
+# When there is one, applies the mechanical part of the update, runs the tests, and opens a pull
+# request that says what passed.
+
+on:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  GITHUB_TOKEN: ${{ github.token }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      update: ${{ steps.branch.outputs.update }}
+      branch: ${{ steps.branch.outputs.name }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Look for a newer NeoForgeAP release
+        id: release
+        run: python3 tools/update_upstream.py --check
+
+      - name: Skip a release that already has its branch
+        id: branch
+        if: steps.release.outputs.updated == 'true'
+        env:
+          BRANCH: upstream/${{ steps.release.outputs.tag }}
+        run: |
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
+            echo "The update is already on the branch $BRANCH."
+          else
+            echo "update=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  update:
+    needs: check
+    if: needs.check.outputs.update == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      BRANCH: ${{ needs.check.outputs.branch }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Apply the release
+        id: apply
+        run: python3 tools/update_upstream.py
+
+      - name: Get Archipelago
+        run: |
+          tag=$(gh api repos/ArchipelagoMW/Archipelago/releases/latest --jq .tag_name)
+          git clone --quiet --depth 1 --branch "$tag" https://github.com/ArchipelagoMW/Archipelago.git Archipelago
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet -r tools/golden/requirements.txt
+
+      - name: Record the apworld's logic
+        id: record
+        continue-on-error: true
+        run: .venv/bin/python tools/golden/generate_vectors.py
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            25
+          cache: gradle
+
+      - name: Test the logic engine
+        id: logic
+        continue-on-error: true
+        run: ./gradlew :core:test --console=plain
+
+      - name: Build the mod
+        id: build
+        continue-on-error: true
+        run: ./gradlew :mod:build --console=plain
+
+      - name: Run the mod in a server
+        id: server
+        continue-on-error: true
+        run: ./gradlew :mod:runGameTestServer --console=plain
+
+      - name: Open the pull request
+        env:
+          TAG: ${{ steps.apply.outputs.tag }}
+          MINECRAFT: ${{ steps.apply.outputs.minecraft }}
+          VERSION: ${{ steps.apply.outputs.version }}
+          RECORD: ${{ steps.record.outcome }}
+          LOGIC: ${{ steps.logic.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          SERVER: ${{ steps.server.outcome }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit --quiet -m "Update to NeoForgeAP $TAG"
+          git push --quiet origin "$BRANCH"
+
+          result() { if [ "$1" = success ]; then echo passed; else echo "**FAILED**"; fi; }
+          cat > "$RUNNER_TEMP/body.md" <<EOF
+          NeoForgeAP **$TAG** (Minecraft $MINECRAFT) is out. This branch holds the mechanical part of the update, made by \`tools/update_upstream.py\`. The tracker becomes **$VERSION**.
+
+          | Step | Result |
+          |---|---|
+          | Record the apworld's logic | $(result "$RECORD") |
+          | Logic engine tests | $(result "$LOGIC") |
+          | Mod build | $(result "$BUILD") |
+          | Mod in a server | $(result "$SERVER") |
+
+          If every step passed, merging is all there is to do: the Build workflow then publishes the release.
+          Otherwise, "Maintaining" in the README says where each kind of failure is fixed. The logs are in [this run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID).
+          EOF
+          title="Update to NeoForgeAP $TAG (Minecraft $MINECRAFT)"
+          # Opening a pull request needs a repository setting (see the README); an issue always works.
+          gh pr create --base main --head "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md" \
+            || gh issue create --title "$title" --body-file "$RUNNER_TEMP/body.md"

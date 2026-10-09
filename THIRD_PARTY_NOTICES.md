@@ -5,9 +5,8 @@ This project builds on the Archipelago Minecraft randomizer. The following parts
 - `core/src/main/java/aptracker/core/logic/Rules.java` is a port of `Rules.py` from the Minecraft
   apworld.
 - `core/src/main/resources/aptracker/data/*.json` are copies of the apworld's data files.
-- `reference/minecraft.apworld` and `reference/aprandomizer-2.2.1-26.2.jar` are unmodified copies of
-  the files released at https://github.com/qixils/NeoForgeAP/releases, kept to build and test
-  against.
+- `reference/minecraft.apworld` and `reference/aprandomizer-*.jar` are unmodified copies of the
+  files released at https://github.com/qixils/NeoForgeAP/releases, kept to build and test against.
 
 ## NeoForgeAP
 
