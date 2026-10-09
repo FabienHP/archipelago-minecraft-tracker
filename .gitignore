@@ -1,0 +1,25 @@
+# Reference clones (upstream repositories, read-only)
+/Archipelago/
+/NeoForgeAP/
+
+# Python environment used by tools/
+.venv/
+__pycache__/
+
+# Gradle
+.gradle/
+build/
+
+# NeoForge dev runs
+run/
+runs/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+out/
+.classpath
+.project
+.settings/
+bin/
