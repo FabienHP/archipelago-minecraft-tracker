@@ -7,8 +7,6 @@ far. Players keep a vanilla Minecraft client: there is nothing to install on the
 It runs next to the randomizer mod ([NeoForgeAP](https://github.com/qixils/NeoForgeAP),
 `aprandomizer`) and reads its state. It does not open a second connection to Archipelago.
 
-Built for Minecraft 26.2, NeoForge 26.2.0.88 and `aprandomizer` 2.2.x.
-
 This is a community project. It is not part of Archipelago or NeoForgeAP.
 
 ## What players see
@@ -25,26 +23,29 @@ The mod's own texts are in English or French, following the language of each cli
 
 ## Installing
 
-Put `aptracker-<version>.jar` in the `mods` folder of the server that Archipelago launches, next to
-`Archipelago.jar`:
+Download the jar of the [latest release](../../releases/latest) and put it in the `mods` folder of
+the server that Archipelago launches, next to `Archipelago.jar`:
 
 ```
-Minecraft AP Server Directory/NeoForge 26.2.0/mods/
+Minecraft AP Server Directory/NeoForge <version>/mods/
 ```
 
-To uninstall, delete that file.
+It can be added to a game that is already under way, and removed by deleting the file: the tracker
+stores nothing in the world.
+
+**One release works with one Minecraft version**, the one named on its release page, as for the
+randomizer mod itself. On another version NeoForge refuses to load it and names the version it
+supports.
 
 ## Building and testing
 
-Gradle needs a JDK 17 or newer to start; it downloads the JDK 25 that Minecraft requires by itself.
+Gradle needs a JDK 17 or newer to start; it downloads the JDK that Minecraft requires by itself.
 
 | Command | What it does |
 |---|---|
 | `./gradlew :mod:build` | Builds the jar into `mod/build/libs/` |
 | `./gradlew :core:test` | Tests the logic engine |
 | `./gradlew :mod:runGameTestServer` | Starts a server with both mods and a mock player, then checks the tab as a client receives it |
-
-The in-server test needs a `.apmc` file in `mod/run/gametest/APData/` (a folder git ignores).
 
 ## Layout
 
@@ -53,9 +54,11 @@ The in-server test needs a `.apmc` file in `mod/run/gametest/APData/` (a folder 
 | `core/` | The logic engine in plain Java, with no Minecraft dependency: a port of the apworld's `Rules.py` |
 | `mod/` | The NeoForge mod: reading the randomizer's state, the tab, the chat message, the command |
 | `reference/` | The apworld and the randomizer jar the project is built and tested against |
-| `tools/golden/` | A Python script that records the results of the apworld's real logic |
+| `tools/` | The scripts that follow NeoForgeAP releases and record the apworld's real logic |
+| `gradle.properties` | Every version the build targets: Minecraft, NeoForge, the NeoForgeAP release, the tracker itself |
 
-`RandomizerState` is the only class that touches the randomizer's classes.
+`RandomizerState` is the only class that touches the randomizer's classes, and `TrackerTab` the
+only one that builds Minecraft advancements.
 
 ## How the logic is checked
 
@@ -67,25 +70,54 @@ The engine is compared with the apworld in two ways:
    `tools/golden/generate_vectors.py` for 120 configurations (combat difficulty, structure compasses,
    death link, shuffled structures).
 
-## Moving to a new apworld version
+## Maintaining
 
-1. Replace `reference/minecraft.apworld`.
-2. Copy its `data/*.json` files into `core/src/main/resources/aptracker/data/`.
-3. Record the results again:
-   ```
-   .venv/Scripts/python tools/golden/generate_vectors.py
-   ```
-4. Run `./gradlew :core:test`. The failing tests point at the rules that changed; carry the changes
-   over to `core/src/main/java/aptracker/core/logic/Rules.java`, which is written in the same order
-   as `Rules.py`.
+The project is set up so that a routine update needs one click.
 
-The script expects a checkout of [Archipelago](https://github.com/ArchipelagoMW/Archipelago) in
-`Archipelago/` (ignored by git) and a Python 3.11 to 3.13 environment:
+### Releases
+
+There is no manual release step. On every push to `main`, the Build workflow runs the tests and
+builds the jar; if `mod_version` in `gradle.properties` has no release yet, it creates the GitHub
+release and publishes the same file to Modrinth. **To release, change `mod_version` and merge.**
+
+Modrinth publishing needs two repository settings (Settings > Secrets and variables > Actions): the
+secret `MODRINTH_TOKEN` (a Modrinth personal access token with the "Create versions" scope) and the
+variable `MODRINTH_PROJECT_ID`. Without them that step is skipped. After adding them, run the Build
+workflow by hand on `main` to publish the current release.
+
+### New NeoForgeAP releases
+
+Every day the Upstream update workflow looks for a NeoForgeAP release newer than `upstream_release`
+in `gradle.properties`. When there is one, it runs `tools/update_upstream.py`, records the new
+apworld's logic, runs every test, and opens a pull request listing what passed. Opening the pull
+request needs Settings > Actions > General > "Allow GitHub Actions to create and approve pull
+requests"; without it the workflow opens an issue that points to the branch instead.
+
+- **Everything passed** (usual for a fix release on the same Minecraft version): merge. The release
+  follows by itself.
+- **The logic tests failed**: the apworld's rules changed. The failing tests name the advancements;
+  carry the changes of the apworld's `Rules.py` over to
+  `core/src/main/java/aptracker/core/logic/Rules.java`, which is written in the same order.
+- **The mod build or the server run failed**: expected for a new Minecraft version, whose classes
+  change. The fixes are in `TrackerTab` (Minecraft's advancement classes) and `RandomizerState` (the
+  randomizer's classes).
+
+GitHub pauses scheduled workflows of a repository with no activity for 60 days; the Actions tab
+offers to turn them back on.
+
+### Doing an update by hand
 
 ```
+python tools/update_upstream.py
 python -m venv .venv
-.venv/Scripts/pip install PyYAML schema jellyfish platformdirs typing_extensions websockets orjson colorama jinja2 pathspec bsdiff4
+.venv/Scripts/pip install -r tools/golden/requirements.txt
+.venv/Scripts/python tools/golden/generate_vectors.py
+./gradlew :core:test :mod:build :mod:runGameTestServer
 ```
+
+The recording script expects a checkout of
+[Archipelago](https://github.com/ArchipelagoMW/Archipelago) in `Archipelago/` (ignored by git) and
+Python 3.11 to 3.13. On Linux and macOS the virtual environment's programs are in `.venv/bin/`.
 
 ## Known limits
 

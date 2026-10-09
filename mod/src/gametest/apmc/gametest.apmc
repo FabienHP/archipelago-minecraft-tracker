@@ -1,0 +1,30 @@
+{
+  "world_seed": 20261009,
+  "seed_name": "gametest",
+  "player_name": "Tester",
+  "player_id": 1,
+  "client_version": 11,
+  "structures": {
+    "Overworld Structure 1": "Village",
+    "Overworld Structure 2": "Nether Fortress",
+    "Nether Structure 1": "Pillager Outpost",
+    "Nether Structure 2": "End City",
+    "The End Structure": "Bastion Remnant"
+  },
+  "advancement_goal": 45,
+  "egg_shards_required": 0,
+  "egg_shards_available": 0,
+  "required_bosses": "both",
+  "MC35": false,
+  "death_link": true,
+  "starting_items": "[]",
+  "race": false,
+  "immediate_respawn": true,
+  "bosses_to_defeat": 3,
+  "shuffle_structures": 1,
+  "structure_compasses": 1,
+  "combat_difficulty": 1,
+  "include_hard_advancements": 1,
+  "include_unreasonable_advancements": 0,
+  "include_postgame_advancements": 0
+}
