@@ -88,10 +88,15 @@ public final class TrackerGameTests {
             helper.assertTrue(diamonds.contains("Progressive Tools 2"), "unexpected text for Diamonds!: " + diamonds);
             String theEnd = location(shown, empty, "The End").description().getString();
             helper.assertTrue(theEnd.contains("3 Ender Pearls ×4"), "unexpected text for The End: " + theEnd);
-            String summary = shown.stream().filter(node -> node.id().getPath().equals("tab/summary")).findFirst()
-                    .orElseThrow().description().getString();
-            helper.assertTrue(summary.contains("Ender Dragon: missing ") && summary.contains("Progressive Weapons 2"),
-                    "unexpected summary: " + summary);
+
+            // The goal comes first; a required boss only counts once it is reached, whatever the items.
+            Node summary = shown.stream().filter(node -> node.id().getPath().equals("tab/summary")).findFirst().orElseThrow();
+            helper.assertTrue(summary.title().getString().equals("Goal: 0 / 45 advancements"),
+                    "unexpected summary title: " + summary.title().getString());
+            String progress = summary.description().getString();
+            helper.assertTrue(progress.contains("Ender Dragon: after the goal") && progress.contains("Wither: after the goal"),
+                    "unexpected summary: " + progress);
+            helper.assertFalse(progress.contains("issing"), "the summary should not list items: " + progress);
 
             // What the randomizer's client holds after the Archipelago server sent these three items.
             setReceivedItems(client, "Progressive Tools", "Progressive Resource Crafting", "Bucket");

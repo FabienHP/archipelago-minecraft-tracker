@@ -82,12 +82,16 @@ enum Texts {
         return pick("Dragon Egg Shards: ", "Fragments d'œuf de dragon : ") + owned + " / " + required;
     }
 
-    String bossReady(String name) {
-        return name + pick(": you have the items to defeat it", " : tu as les objets pour le vaincre");
+    String bossAfterGoal(String name) {
+        return name + pick(": after the goal", " : après l'objectif");
     }
 
-    String bossMissing(String name, String items) {
-        return name + pick(": missing ", " : il manque ") + items;
+    String bossReady(String name) {
+        return name + pick(": go and defeat it", " : à vaincre maintenant");
+    }
+
+    String bossDefeated(String name) {
+        return name + pick(": defeated", " : vaincu");
     }
 
     String notConnected() {

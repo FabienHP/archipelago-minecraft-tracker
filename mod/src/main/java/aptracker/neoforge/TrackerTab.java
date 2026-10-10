@@ -185,8 +185,11 @@ final class TrackerTab {
         nodes.put(ROOT, new Node(ROOT, Optional.empty(), new ItemStackTemplate(Items.COMPASS),
                 Component.literal(texts.tabTitle()), Component.literal(texts.tabDescription()), AdvancementType.TASK,
                 0, 0, true));
+        // The goal is the title: it is what ends the game, and a longer title gives a wider tooltip.
+        int goal = world.options().advancementGoal();
+        String summaryTitle = goal > 0 ? texts.goal(snapshot.count(Status.CHECKED), goal) : texts.progressTitle();
         nodes.put(SUMMARY, new Node(SUMMARY, Optional.of(ROOT), new ItemStackTemplate(Items.KNOWLEDGE_BOOK),
-                Component.literal(texts.progressTitle()), summary(texts, tracker, snapshot, state), AdvancementType.GOAL,
+                Component.literal(summaryTitle), summary(texts, tracker, snapshot, state), AdvancementType.GOAL,
                 1, 0, true));
 
         // Regions in the apworld's order; within a region, locations keep the Archipelago order.
@@ -241,29 +244,31 @@ final class TrackerTab {
         }
         text.append(Component.literal(texts.doableCount(snapshot.count(Status.IN_LOGIC))).withStyle(ChatFormatting.GREEN));
         text.append("\n").append(texts.checkedCount(checked, snapshot.locations().size()));
-        if (options.advancementGoal() > 0) {
-            text.append("\n").append(texts.goal(checked, options.advancementGoal()));
-        }
         if (options.eggShardsRequired() > 0) {
             int shards = snapshot.items().getOrDefault("Dragon Egg Shard", 0);
             text.append("\n").append(texts.eggShards(shards, options.eggShardsRequired()));
         }
         if (options.requiredBosses().dragon()) {
-            text.append("\n").append(boss(texts, LogicWorld.EVENT_ENDER_DRAGON, snapshot.enderDragonInLogic(), tracker, snapshot));
+            text.append("\n").append(boss(texts, "Ender Dragon", state.goalReached(), state.dragonDefeated()));
         }
         if (options.requiredBosses().wither()) {
-            text.append("\n").append(boss(texts, LogicWorld.EVENT_WITHER, snapshot.witherInLogic(), tracker, snapshot));
+            text.append("\n").append(boss(texts, "Wither", state.goalReached(), state.witherDefeated()));
         }
         return text;
     }
 
-    /** Whether the items received are enough to defeat a required boss, and which ones are missing if not. */
-    private Component boss(Texts texts, String boss, boolean inLogic, Tracker tracker, Snapshot snapshot) {
-        if (inLogic) {
-            return Component.literal(texts.bossReady(boss)).withStyle(ChatFormatting.GREEN);
+    /**
+     * Where a required boss stands. What ends the game is the randomizer's own rule, not item logic:
+     * a boss counts only when it is defeated after the goal is reached.
+     */
+    private static Component boss(Texts texts, String name, boolean goalReached, boolean defeated) {
+        if (defeated) {
+            return Component.literal(texts.bossDefeated(name)).withStyle(ChatFormatting.GREEN);
         }
-        Map<String, Integer> missing = Requirements.missing(tracker.world().expandedLocationRule(boss), snapshot.items());
-        return Component.literal(texts.bossMissing(boss, itemList(missing))).withStyle(ChatFormatting.RED);
+        if (goalReached) {
+            return Component.literal(texts.bossReady(name)).withStyle(ChatFormatting.GOLD);
+        }
+        return Component.literal(texts.bossAfterGoal(name)).withStyle(ChatFormatting.GRAY);
     }
 
     private Node regionNode(Identifier id, String region, int row, List<LocationState> remaining, Texts texts,

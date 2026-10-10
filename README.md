@@ -17,7 +17,8 @@ This is a community project. It is not part of Archipelago or NeoForgeAP.
   come first and are lit. Below them, region by region, are the ones still out of logic; hovering one
   lists the items it is waiting for (`Missing: Bucket, Progressive Tools 2`, where the number is the
   level needed). Each region says whether it is reachable and, for a shuffled structure, which
-  dimension holds it. The "Progress" entry also lists what is missing to defeat the required bosses.
+  dimension holds it. The first entry shows the goal and where the required bosses stand: the
+  randomizer only counts a boss that is defeated after the goal is reached.
 - **A chat message** when a received item makes new advancements doable.
 - **The `/tracker` command**, which lists the doable advancements and brings the tab forward.
 
@@ -129,8 +130,9 @@ Python 3.11 to 3.13. On Linux and macOS the virtual environment's programs are i
   says so and only shows what is doable without any item.
 - The rule of "Overkill" depends on the `exclude_locations` list of the player's YAML, which neither
   the `.apmc` file nor the Archipelago server passes on. It is assumed to be empty.
-- Advancements that need a boss to be defeated are judged on items only, as in the apworld: the
-  tracker does not check that the number of advancements required to make the boss appear is reached.
+- "Doable" and "missing" follow the apworld's logic: the items the generator guarantees before it
+  expects an advancement from you. Some can be done earlier with other means, as in any Archipelago
+  game.
 
 ## License
 

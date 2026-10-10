@@ -4,8 +4,10 @@ import aptracker.core.data.GameData;
 import gg.archipelago.aprandomizer.APRandomizer;
 import gg.archipelago.aprandomizer.APRegistries;
 import gg.archipelago.aprandomizer.ap.APClient;
+import gg.archipelago.aprandomizer.data.WorldData;
 import gg.archipelago.aprandomizer.locations.APLocation;
 import gg.archipelago.aprandomizer.locations.AdvancementLocation;
+import gg.archipelago.aprandomizer.managers.GoalManager;
 import gg.archipelago.aprandomizer.managers.advancementmanager.AdvancementManager;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.Identifier;
@@ -25,8 +27,13 @@ import java.util.Set;
  * @param connected          whether the randomizer is connected to the Archipelago server
  * @param receivedItemIds    the Archipelago ids of every item received, with repeats
  * @param checkedLocationIds the Archipelago ids of the advancements already earned
+ * @param goalReached        whether the advancement and egg shard goals are met; the randomizer
+ *                           only counts a required boss that is defeated after that
+ * @param dragonDefeated     whether the Ender Dragon was defeated once the goal was reached
+ * @param witherDefeated     whether the Wither was defeated once the goal was reached
  */
-record RandomizerState(boolean connected, List<Long> receivedItemIds, Set<Long> checkedLocationIds) {
+record RandomizerState(boolean connected, List<Long> receivedItemIds, Set<Long> checkedLocationIds,
+                       boolean goalReached, boolean dragonDefeated, boolean witherDefeated) {
 
     static RandomizerState read(GameData data) {
         Set<Long> checked = new HashSet<>();
@@ -46,7 +53,13 @@ record RandomizerState(boolean connected, List<Long> receivedItemIds, Set<Long> 
         if (client != null) {
             items = List.copyOf(client.getItemManager().getReceivedItemIDs());
         }
-        return new RandomizerState(APRandomizer.isConnected(), items, Set.copyOf(checked));
+
+        GoalManager goals = APRandomizer.getGoalManager();
+        WorldData world = APRandomizer.getWorldData();
+        return new RandomizerState(APRandomizer.isConnected(), items, Set.copyOf(checked),
+                goals != null && goals.goalsDone(),
+                world != null && world.isDragonKilled(),
+                world != null && world.isWitherKilled());
     }
 
     /** The Minecraft advancement behind each Archipelago location id. */
